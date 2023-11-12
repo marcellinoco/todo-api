@@ -198,11 +198,7 @@ app.get(
     const listId = req.params.listId;
 
     try {
-      const list = await TodoList.findOne({
-        where: { id: listId },
-        include: [{ model: TodoItem }],
-      });
-
+      const list = await TodoList.findByPk(listId);
       if (!list) {
         return res
           .status(404)
@@ -210,7 +206,6 @@ app.get(
       }
 
       const items = await TodoItem.findAll({ where: { list_id: listId } });
-
       if (items && items.length) {
         return res.json(items);
       }
@@ -237,11 +232,7 @@ app.post(
     }
 
     try {
-      const list = await TodoList.findOne({
-        where: { id: listId },
-        include: [{ model: TodoItem }],
-      });
-
+      const list = await TodoList.findByPk(listId);
       if (!list) {
         return res
           .status(404)
@@ -256,15 +247,13 @@ app.post(
 
       const updatedList = await TodoList.findOne({
         where: { id: listId },
-        include: [{ model: TodoItem }],
+        include: [{ model: TodoItem, as: "items" }],
       });
 
-      return res
-        .status(201)
-        .json({
-          message: "To-do item created successfully",
-          list: updatedList,
-        });
+      return res.status(201).json({
+        message: "To-do item created successfully",
+        list: updatedList,
+      });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
