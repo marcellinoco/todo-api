@@ -11,7 +11,10 @@ module.exports = (sequelize, DataTypes) => {
   TodoItem.init(
     {
       content: DataTypes.STRING,
-      is_completed: DataTypes.BOOLEAN,
+      is_completed: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
       due_date: DataTypes.DATE,
       list_id: DataTypes.INTEGER,
     },
@@ -20,6 +23,6 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "TodoItem",
     }
   );
-  
+
   return TodoItem;
 };

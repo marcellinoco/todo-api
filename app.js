@@ -58,14 +58,30 @@ const canEditTodoList = async (req, res, next) => {
 
   try {
     const permission = await UserTodo.findOne({
-      where: { user_id: uid, list_id: listId },
+      where: { user_id: uid, list_id: listId, access_type: "edit" },
     });
 
-    if (permission && permission.access_type === "edit") {
-      return next();
-    } else {
-      return res.status(403).json({ error: "Not authorized" });
-    }
+    if (permission) return next();
+    return res.status(403).json({ error: "Not authorized" });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+};
+
+const canEditTodoItem = async (req, res, next) => {
+  const uid = req.session.uid;
+  const itemId = req.params.itemId;
+
+  try {
+    const item = await TodoItem.findByPk(itemId);
+    const listId = item.list_id;
+
+    const permission = await UserTodo.findOne({
+      where: { user_id: uid, list_id: listId, access_type: "edit" },
+    });
+
+    if (permission) return next();
+    return res.status(403).json({ error: "Not authorized" });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -252,6 +268,38 @@ app.post(
 
       return res.status(201).json({
         message: "To-do item created successfully",
+        list: updatedList,
+      });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
+
+app.put(
+  "/items/:itemId",
+  isAuthenticated,
+  canEditTodoItem,
+  async (req, res) => {
+    const { itemId } = req.params;
+
+    try {
+      const item = await TodoItem.findByPk(itemId);
+      if (!item) {
+        return res
+          .status(404)
+          .json({ message: `No to-do item found for id ${itemId}` });
+      }
+
+      item.is_completed = !item.is_completed;
+      await item.save();
+
+      const updatedList = await TodoList.findByPk(item.list_id, {
+        include: [{ model: TodoItem, as: "items" }],
+      });
+
+      return res.json({
+        message: "To-do item updated successfully",
         list: updatedList,
       });
     } catch (e) {
