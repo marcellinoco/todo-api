@@ -214,6 +214,26 @@ app.post("/lists", isAuthenticated, async (req, res) => {
   }
 });
 
+app.delete("/lists", isAuthenticated, async (req, res) => {
+  const uid = req.session.uid;
+
+  try {
+    const transaction = await sequelize.transaction();
+
+    await TodoItem.destroy(
+      { where: {}, include: [{ model: TodoList, where: { owner_id: uid } }] },
+      { transaction }
+    );
+    await TodoList.destroy({ where: { owner_id: uid } }, { transaction });
+
+    await transaction.commit();
+
+    return res.json({ message: "To-do lists deleted successfully" });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 app.delete(
   "/lists/:listId",
   isAuthenticated,
@@ -222,7 +242,16 @@ app.delete(
     const listId = req.params.listId;
 
     try {
-      const list = await TodoList.destroy({ where: { id: listId } });
+      const transaction = await sequelize.transaction();
+
+      await TodoItem.destroy({ where: { list_id: listId } }, { transaction });
+      const list = await TodoList.destroy(
+        { where: { id: listId } },
+        { transaction }
+      );
+
+      await transaction.commit();
+
       if (list) {
         return res.json({ message: "To-do list deleted successfully", list });
       }
