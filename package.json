@@ -1,0 +1,19 @@
+{
+  "name": "todo-api",
+  "version": "1.0.0",
+  "description": "Open source backend API implementation for a to-do list application with Express and MySQL",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "author": "marcellinoco",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.3",
+    "sequelize": "^6.34.0"
+  },
+  "devDependencies": {
+    "sequelize-cli": "^6.6.2"
+  }
+}
