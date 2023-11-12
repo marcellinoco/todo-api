@@ -45,3 +45,16 @@ erDiagram
     }
 ```
 
+## Deployment:
+
+To start the server, run:
+
+```bash
+docker compose up --build -d
+```
+
+Optionally, to seed the database, run:
+
+```bash
+docker compose run app npx sequelize db:seed:all
+```
