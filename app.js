@@ -30,6 +30,20 @@ const isAuthenticated = (req, res, next) => {
   }
 };
 
+const isOwnerTodoList = async (req, res, next) => {
+  const uid = req.session.uid;
+  const listId = req.params.listId;
+
+  try {
+    const list = await TodoList.findByPk(listId);
+
+    if (list.owner_id === uid) return next();
+    return res.status(403).json({ error: "Not authorized" });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+};
+
 const canAccessTodoList = async (req, res, next) => {
   const uid = req.session.uid;
   const listId = req.params.listId;
@@ -39,14 +53,8 @@ const canAccessTodoList = async (req, res, next) => {
       where: { user_id: uid, list_id: listId },
     });
 
-    if (
-      permission &&
-      (permission.access_type === "edit" || permission.access_type === "view")
-    ) {
-      return next();
-    } else {
-      return res.status(403).json({ error: "Not authorized" });
-    }
+    if (permission) return next();
+    return res.status(403).json({ error: "Not authorized" });
   } catch (e) {
     return res.status(500).json({ error: e.message });
   }
@@ -206,6 +214,28 @@ app.post("/lists", isAuthenticated, async (req, res) => {
   }
 });
 
+app.delete(
+  "/lists/:listId",
+  isAuthenticated,
+  isOwnerTodoList,
+  async (req, res) => {
+    const listId = req.params.listId;
+
+    try {
+      const list = await TodoList.destroy({ where: { id: listId } });
+      if (list) {
+        return res.json({ message: "To-do list deleted successfully", list });
+      }
+
+      return res
+        .status(404)
+        .json({ message: `No to-do list found for id ${listId}` });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
+
 app.get(
   "/lists/:listId/items",
   isAuthenticated,
@@ -261,8 +291,7 @@ app.post(
         list_id: listId,
       });
 
-      const updatedList = await TodoList.findOne({
-        where: { id: listId },
+      const updatedList = await TodoList.findByPk(listId, {
         include: [{ model: TodoItem, as: "items" }],
       });
 
@@ -302,6 +331,28 @@ app.put(
         message: "To-do item updated successfully",
         list: updatedList,
       });
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
+
+app.delete(
+  "/items/:itemId",
+  isAuthenticated,
+  canEditTodoItem,
+  async (req, res) => {
+    const { itemId } = req.params;
+
+    try {
+      const item = await TodoItem.destroy({ where: { id: itemId } });
+      if (item) {
+        return res.json({ message: "To-do item deleted successfully", item });
+      }
+
+      return res
+        .status(404)
+        .json({ message: `No to-do item found for id ${itemId}` });
     } catch (e) {
       return res.status(500).json({ error: e.message });
     }
