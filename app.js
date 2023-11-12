@@ -271,7 +271,7 @@ app.post(
   isOwnerTodoList,
   async (req, res) => {
     const listId = req.params.listId;
-    const { userId, accessType } = req.body;
+    const { user_id: userId, access_type: accessType } = req.body;
 
     if (!userId || !accessType) {
       return res.status(400).json({ error: "Missing required body params" });
