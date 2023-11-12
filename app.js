@@ -116,35 +116,21 @@ app.post("/logout", (req, res) => {
 });
 
 app.get("/lists", isAuthenticated, async (req, res) => {
+  const uid = req.session.uid;
+
   try {
-    const uid = req.session.uid;
+    const lists = (
+      await UserTodo.findAll({
+        where: { user_id: uid },
+        include: [{ model: TodoList }],
+      })
+    ).map((userTodo) => ({
+      ...userTodo.TodoList.get({ plain: true }),
+      access_type: userTodo.access_type,
+    }));
 
-    const ownedLists = await TodoList.findAll({ where: { owner_id: uid } });
-    const accessibleLists = await UserTodo.findAll({
-      where: { user_id: uid },
-      include: [{ model: TodoList }],
-    });
-
-    // Map access_type attributes
-    const combinedLists = [
-      ...accessibleLists.map((userTodo) => ({
-        ...userTodo.TodoList.get({ plain: true }),
-        access_type: userTodo.access_type,
-      })),
-      ...ownedLists.map((list) => ({
-        ...list.get({ plain: true }),
-        access_type: "owner",
-      })),
-    ];
-
-    // Filter unique lists
-    const uniqueLists = Array.from(
-      new Map(combinedLists.map((list) => [list["id"], list])).values()
-    );
-
-    if (uniqueLists && uniqueLists.length) {
-      const sortedLists = uniqueLists.sort((a, b) => a.id - b.id);
-      return res.json(sortedLists);
+    if (lists && lists.length) {
+      return res.json(lists);
     } else {
       return res
         .status(404)
@@ -160,10 +146,10 @@ app.get(
   isAuthenticated,
   canAccessTodoList,
   async (req, res) => {
-    try {
-      const listId = req.params.listId;
-      const items = await TodoItem.findAll({ where: { list_id: listId } });
+    const listId = req.params.uid;
 
+    try {
+      const items = await TodoItem.findAll({ where: { list_id: listId } });
       if (items && items.length) {
         return res.json(items);
       } else {
@@ -176,6 +162,34 @@ app.get(
     }
   }
 );
+
+app.post("/lists", isAuthenticated, async (req, res) => {
+  const uid = req.session.uid;
+  const { title, description } = req.body;
+
+  if (!title || !description) {
+    return res.status(400).json({ error: "Missing required body params" });
+  }
+
+  try {
+    const transaction = await sequelize.transaction();
+    const list = await TodoList.create(
+      { title, description, owner_id: uid },
+      { transaction }
+    );
+    await UserTodo.create(
+      { user_id: uid, list_id: list.id, access_type: "edit" },
+      { transaction }
+    );
+    await transaction.commit();
+
+    return res
+      .status(201)
+      .json({ message: "To-do list created successfully", list });
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
