@@ -236,6 +236,44 @@ app.delete(
   }
 );
 
+app.post(
+  "/lists/:listId/permissions",
+  isAuthenticated,
+  isOwnerTodoList,
+  async (req, res) => {
+    const listId = req.params.listId;
+    const { userId, accessType } = req.body;
+
+    if (!userId || !accessType) {
+      return res.status(400).json({ error: "Missing required body params" });
+    } else if (!["edit", "view"].includes(accessType)) {
+      return res.status(400).json({ error: "Invalid accessType value" });
+    }
+
+    try {
+      const list = await TodoList.findByPk(listId);
+      if (!list) {
+        return res
+          .status(404)
+          .json({ message: `No to-do list found for id ${listId}` });
+      }
+
+      const permission = await UserTodo.create({
+        user_id: userId,
+        list_id: listId,
+        access_type: accessType,
+      });
+
+      res.status(201).json({
+        message: "Permission given successfully",
+        permission,
+      });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  }
+);
+
 app.get(
   "/lists/:listId/items",
   isAuthenticated,
