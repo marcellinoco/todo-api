@@ -5,7 +5,7 @@ module.exports = (sequelize, DataTypes) => {
   class TodoList extends Model {
     static associate(models) {
       TodoList.belongsTo(models.User, { foreignKey: "owner_id" });
-      TodoList.hasMany(models.TodoItem, { foreignKey: "list_id" });
+      TodoList.hasMany(models.TodoItem, { foreignKey: "list_id", as: "items" });
       TodoList.hasMany(models.UserTodo, { foreignKey: "list_id" });
     }
   }
@@ -21,6 +21,6 @@ module.exports = (sequelize, DataTypes) => {
       modelName: "TodoList",
     }
   );
-  
+
   return TodoList;
 };

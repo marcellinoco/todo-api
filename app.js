@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const express = require("express");
 const session = require("express-session");
 
-const { sequelize, User, TodoList, TodoItem } = require("./models");
+const { sequelize, User, UserTodo, TodoList, TodoItem } = require("./models");
 
 sequelize.sync().then(() => {
   console.log("Database synchronized");
@@ -22,11 +22,33 @@ app.use(
   })
 );
 
-const authMiddleware = (req, res, next) => {
+const isAuthenticated = (req, res, next) => {
   if (req.session.uid) {
     return next();
   } else {
     return res.status(401).json({ error: "Not authenticated" });
+  }
+};
+
+const canAccessTodoList = async (req, res, next) => {
+  const uid = req.session.uid;
+  const listId = req.params.listId;
+
+  try {
+    const permission = await UserTodo.findOne({
+      where: { user_id: uid, list_id: listId },
+    });
+
+    if (
+      permission &&
+      (permission.access_type === "edit" || permission.access_type === "view")
+    ) {
+      return next();
+    } else {
+      return res.status(403).json({ error: "Not authorized" });
+    }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
   }
 };
 
@@ -92,6 +114,68 @@ app.post("/logout", (req, res) => {
     return res.json({ message: "Logout successful" });
   });
 });
+
+app.get("/lists", isAuthenticated, async (req, res) => {
+  try {
+    const uid = req.session.uid;
+
+    const ownedLists = await TodoList.findAll({ where: { owner_id: uid } });
+    const accessibleLists = await UserTodo.findAll({
+      where: { user_id: uid },
+      include: [{ model: TodoList }],
+    });
+
+    // Map access_type attributes
+    const combinedLists = [
+      ...accessibleLists.map((userTodo) => ({
+        ...userTodo.TodoList.get({ plain: true }),
+        access_type: userTodo.access_type,
+      })),
+      ...ownedLists.map((list) => ({
+        ...list.get({ plain: true }),
+        access_type: "owner",
+      })),
+    ];
+
+    // Filter unique lists
+    const uniqueLists = Array.from(
+      new Map(combinedLists.map((list) => [list["id"], list])).values()
+    );
+
+    if (uniqueLists && uniqueLists.length) {
+      const sortedLists = uniqueLists.sort((a, b) => a.id - b.id);
+      return res.json(sortedLists);
+    } else {
+      return res
+        .status(404)
+        .json({ error: "No to-do lists found for this user" });
+    }
+  } catch (e) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+app.get(
+  "/lists/:listId",
+  isAuthenticated,
+  canAccessTodoList,
+  async (req, res) => {
+    try {
+      const listId = req.params.listId;
+      const items = await TodoItem.findAll({ where: { list_id: listId } });
+
+      if (items && items.length) {
+        return res.json(items);
+      } else {
+        return res
+          .status(404)
+          .json({ message: "No to-do items found for this list" });
+      }
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+);
 
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
